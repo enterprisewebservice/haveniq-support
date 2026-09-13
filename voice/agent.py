@@ -43,6 +43,8 @@ TTS_VOICE = os.environ.get("TTS_VOICE", "inworld/inworld-tts-2:Ashley")
 S3_ENDPOINT, S3_BUCKET = os.environ.get("S3_ENDPOINT", ""), os.environ.get("S3_BUCKET", "")
 S3_ACCESS_KEY, S3_SECRET_KEY = os.environ.get("AWS_ACCESS_KEY_ID", ""), os.environ.get("AWS_SECRET_ACCESS_KEY", "")
 IDLE_HANGUP_S = int(os.environ.get("IDLE_HANGUP_S", "240"))
+ALLOWED_TOOLS = ["home_find_account", "home_get_orders", "home_get_devices", "home_device_state", "home_set_thermostat",
+                 "crm_find_customer", "crm_open_ticket", "crm_add_note", "crm_request_handoff", "crm_get_ticket"]
 
 INSTRUCTIONS = """You are Haven, the voice support agent for HavenIQ, a smart-home company (thermostats, cameras, door locks,
 sensors, and a cloud video subscription). You are on a live phone-style call: keep every answer short, natural and
@@ -148,21 +150,19 @@ def build_tts() -> agents_tts.TTS:
 
 async def prefetch_account(phone: str) -> dict | None:
     """Ask the cloud for the account before the first word so the greeting can use the caller's name.
-    This goes through the gateway like every other tool call (the worker is a registered caller)."""
+    Same road as every other tool call: the MCP gateway, with this worker's caller key."""
     if not phone:
         return None
     try:
-        srv = mcp.MCPServerHTTP(url=GATEWAY_MCP_URL, headers={"Authorization": f"Bearer {GATEWAY_CALLER_KEY}"}, timeout=15)
-        await srv.initialize()
-        tools = await srv.list_tools()
-        name = next((t.name for t in tools if t.name.endswith("find_account")), None)
-        if not name:
-            return None
-        res = await srv.call_tool(name, {"phone": phone})
-        text = "".join(getattr(c, "text", "") for c in getattr(res, "content", []) or [])
-        data = json.loads(text) if text.strip().startswith("{") else {}
-        await srv.aclose()
-        return data if data.get("found") else None
+        from mcp import ClientSession
+        from mcp.client.streamable_http import streamablehttp_client
+        async with streamablehttp_client(GATEWAY_MCP_URL, headers={"Authorization": f"Bearer {GATEWAY_CALLER_KEY}"}) as (r, w, _):
+            async with ClientSession(r, w) as s:
+                await s.initialize()
+                res = await s.call_tool("home_find_account", {"phone": phone})
+                text = "".join(getattr(c, "text", "") for c in res.content)
+                data = json.loads(text) if text.strip().startswith("{") else {}
+                return data if data.get("found") else None
     except Exception as e:
         log.info("prefetch skipped: %s", e)
         return None
@@ -191,7 +191,9 @@ async def entrypoint(ctx: JobContext):
     else:
         ctx_text += "The caller's account is not known yet.\n"
 
-    gateway = mcp.MCPServerHTTP(url=GATEWAY_MCP_URL, headers={"Authorization": f"Bearer {GATEWAY_CALLER_KEY}"}, timeout=20)
+    # the gateway lists every registered tool to every caller; this worker is only allowed (and only needs) HavenIQ's two families
+    gateway = mcp.MCPServerHTTP(url=GATEWAY_MCP_URL, headers={"Authorization": f"Bearer {GATEWAY_CALLER_KEY}"}, timeout=20,
+                                client_session_timeout_seconds=30, allowed_tools=ALLOWED_TOOLS)
     session_ref: dict = {}
     session = AgentSession(
         stt=inference.STT(STT_MODEL),
