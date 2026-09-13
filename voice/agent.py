@@ -29,11 +29,12 @@ log = logging.getLogger("haveniq")
 logging.basicConfig(level=logging.INFO)
 
 AGENT_NAME = os.environ.get("AGENT_NAME", "haveniq-support")
-LLM_BASE_URL = os.environ["LLM_BASE_URL"].rstrip("/")
-LLM_API_KEY = os.environ["LLM_API_KEY"]
+# read lazily: the image build runs `agent.py download-files` with no environment at all
+LLM_BASE_URL = os.environ.get("LLM_BASE_URL", "").rstrip("/")
+LLM_API_KEY = os.environ.get("LLM_API_KEY", "")
 LLM_MODEL = os.environ.get("LLM_MODEL", "gpt-4o-mini")
-GATEWAY_MCP_URL = os.environ["GATEWAY_MCP_URL"]
-GATEWAY_CALLER_KEY = os.environ["GATEWAY_CALLER_KEY"]
+GATEWAY_MCP_URL = os.environ.get("GATEWAY_MCP_URL", "")
+GATEWAY_CALLER_KEY = os.environ.get("GATEWAY_CALLER_KEY", "")
 CLOUD_URL = os.environ.get("CLOUD_URL", "http://haveniq-cloud.haveniq.svc:8080").rstrip("/")
 CRM_URL = os.environ.get("CRM_URL", "http://haveniq-crm.haveniq.svc:8080").rstrip("/")
 DESK_PUBLIC_URL = os.environ.get("DESK_PUBLIC_URL", "").rstrip("/")
@@ -168,6 +169,9 @@ async def prefetch_account(phone: str) -> dict | None:
 
 
 async def entrypoint(ctx: JobContext):
+    for var in ("LLM_BASE_URL", "LLM_API_KEY", "GATEWAY_MCP_URL", "GATEWAY_CALLER_KEY"):
+        if not os.environ.get(var):
+            raise RuntimeError(f"{var} is not set")
     await ctx.connect()
     meta = {}
     try:
