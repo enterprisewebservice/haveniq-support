@@ -53,6 +53,12 @@ zammadConfig:
     host: zammad-redis
     port: 6379
     username: ""
+  # Ruby refuses a world-writable temp dir without the sticky bit (attachments over ~1 MB fail with 'could not find a
+  # temporary directory'); a memory-backed emptyDir mounts as tmpfs with the sticky bit, as the chart's own note suggests.
+  tmpDirVolume:
+    emptyDir:
+      medium: Memory
+      sizeLimit: 512Mi
   initContainers:
     volumePermissions:
       enabled: false
