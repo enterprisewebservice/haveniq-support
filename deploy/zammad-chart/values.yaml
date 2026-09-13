@@ -22,6 +22,18 @@ secrets:
     secretName: redis-pass
     secretKey: redis-password
 zammadConfig:
+  # OpenShift runs the pods with a random UID: the image's log and storage directories are owned by the
+  # build-time user, so they get writable volumes (tmp already does in the chart).
+  customVolumes:
+    - name: zammad-log
+      emptyDir: {}
+    - name: zammad-storage
+      emptyDir: {}
+  customVolumeMounts:
+    - name: zammad-log
+      mountPath: /opt/zammad/log
+    - name: zammad-storage
+      mountPath: /opt/zammad/storage
   elasticsearch:
     enabled: false
     initialisation: false
