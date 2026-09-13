@@ -43,6 +43,9 @@ spec:
             - { name: DESK_PUBLIC_URL, value: https://haveniq.apps.salamander.aimlworkbench.com }
             - { name: STT_MODEL, value: deepgram/nova-3 }
             - { name: TTS_VOICE, value: "inworld/inworld-tts-2:Ashley" }
+            - { name: CASE_GATEWAY_URL, value: http://haveniq-case.agent-office.svc:18789/v1 }
+            - { name: CASE_MODEL, value: openclaw/haveniq-case-worker }
+            - { name: CASE_GATEWAY_TOKEN, valueFrom: { secretKeyRef: { name: case-gateway-token, key: OPENCLAW_GATEWAY_TOKEN, optional: true } } }
             - { name: S3_ENDPOINT, value: https://s3-openshift-storage.apps.salamander.aimlworkbench.com }
             - { name: S3_BUCKET, valueFrom: { configMapKeyRef: { name: haveniq-recordings, key: BUCKET_NAME, optional: true } } }
             - { name: AWS_ACCESS_KEY_ID, valueFrom: { secretKeyRef: { name: haveniq-recordings, key: AWS_ACCESS_KEY_ID, optional: true } } }

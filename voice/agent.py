@@ -43,6 +43,9 @@ TTS_VOICE = os.environ.get("TTS_VOICE", "inworld/inworld-tts-2:Ashley")
 S3_ENDPOINT, S3_BUCKET = os.environ.get("S3_ENDPOINT", ""), os.environ.get("S3_BUCKET", "")
 S3_ACCESS_KEY, S3_SECRET_KEY = os.environ.get("AWS_ACCESS_KEY_ID", ""), os.environ.get("AWS_SECRET_ACCESS_KEY", "")
 IDLE_HANGUP_S = int(os.environ.get("IDLE_HANGUP_S", "240"))
+CASE_GATEWAY_URL = os.environ.get("CASE_GATEWAY_URL", "").rstrip("/")
+CASE_GATEWAY_TOKEN = os.environ.get("CASE_GATEWAY_TOKEN", "")
+CASE_MODEL = os.environ.get("CASE_MODEL", "openclaw/haveniq-case-worker")
 ALLOWED_TOOLS = ["home_find_account", "home_get_orders", "home_get_devices", "home_device_state", "home_set_thermostat",
                  "crm_find_customer", "crm_open_ticket", "crm_add_note", "crm_request_handoff", "crm_get_ticket"]
 
@@ -281,8 +284,44 @@ async def entrypoint(ctx: JobContext):
             log.warning("recording attach failed: %s", e)
     elif rec:
         log.info("recording %s kept in the bucket; no ticket was opened on this call", rec[0])
+    await file_the_call(session, ctx.room.name, state, rec)
     await lk.aclose()
     ctx.shutdown(reason="call over")
+
+
+def transcript_lines(session: AgentSession) -> list[str]:
+    lines = []
+    try:
+        for item in session.history.items:
+            role = getattr(item, "role", None)
+            text = getattr(item, "text_content", None)
+            if role in ("user", "assistant") and text:
+                lines.append(f"{'Caller' if role == 'user' else 'Agent'}: {text}")
+    except Exception as e:
+        log.info("transcript unavailable: %s", e)
+    return lines
+
+
+async def file_the_call(session: AgentSession, room: str, state: CallState, rec):
+    """Hand the finished call to the case-worker agent (an AgentWorkstation on the platform) through its gateway's
+    OpenAI-compatible face. It files the case in the desk with its own governed tools; this worker just delivers the
+    transcript and moves on."""
+    if not (CASE_GATEWAY_URL and CASE_GATEWAY_TOKEN):
+        log.info("no case worker configured; skipping the after-call filing")
+        return
+    lines = transcript_lines(session)
+    if not lines:
+        return
+    msg = (f"A call just ended.\nRoom: {room}\nTicket id: {state.ticket_id or 'none'}\nRecording: {rec[0] if rec else 'none'}\n"
+           f"Account (if known): {json.dumps(state.account) if state.account else 'unknown'}\n\nTranscript:\n" + "\n".join(lines))
+    try:
+        async with aiohttp.ClientSession() as s:
+            r = await s.post(f"{CASE_GATEWAY_URL}/chat/completions", headers={"Authorization": f"Bearer {CASE_GATEWAY_TOKEN}"},
+                             json={"model": CASE_MODEL, "messages": [{"role": "user", "content": msg}]}, timeout=aiohttp.ClientTimeout(total=200))
+            body = await r.text()
+            log.info("case worker filed the call: %s %s", r.status, body[:300].replace("\n", " "))
+    except Exception as e:
+        log.warning("case worker hand-over failed: %s", e)
 
 
 if __name__ == "__main__":

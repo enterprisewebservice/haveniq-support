@@ -1,0 +1,112 @@
+# The case worker: an agent hired the framework way (AgentGateway + AgentWorkstation + Skill in git, reconciled by
+# the operator) that files every call after it ends and answers the support team in Mattermost. The voice worker
+# hands it the transcript through the gateway's OpenAI-compatible face; it works the ticket through the same MCP
+# gateway with its own generated caller key. Runs in agent-office like the other platform agents.
+apiVersion: generators.external-secrets.io/v1alpha1
+kind: Password
+metadata: { name: haveniq-case-caller-key, namespace: agent-office }
+spec: { length: 48, digits: 10, symbols: 0, symbolCharacters: "", noUpper: false, allowRepeat: true }
+---
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata: { name: haveniq-case-caller, namespace: agent-office }
+spec:
+  refreshInterval: "0"
+  target:
+    name: haveniq-case-caller
+    creationPolicy: Owner
+    template:
+      metadata:
+        labels: { agentoffice.ai/mcp-gateway-caller: "true", authorino.kuadrant.io/managed-by: authorino }
+        annotations:
+          agentoffice.ai/mcp-caller: haveniq-case-worker
+          agentoffice.ai/mcp-namespace: agent-office
+          agentoffice.ai/mcp-servers: "agent-office/haveniq-cloud,agent-office/haveniq-crm"
+      data:
+        api_key: "{{ .password }}"
+        CASE_KEY: "{{ .password }}"
+  dataFrom:
+    - sourceRef: { generatorRef: { apiVersion: generators.external-secrets.io/v1alpha1, kind: Password, name: haveniq-case-caller-key } }
+---
+apiVersion: agentoffice.ai/v1alpha1
+kind: Skill
+metadata: { name: haveniq-case-worker, namespace: agent-office }
+spec:
+  displayName: HavenIQ case worker
+  description: File a finished support call as a case and answer the support team about it.
+  version: "1.0.0"
+  dependencies:
+    - { kind: mcpServer, name: haveniq-crm }
+    - { kind: mcpServer, name: haveniq-cloud }
+  source:
+    inline: |
+      ---
+      name: haveniq-case-worker
+      description: File a finished HavenIQ support call as a case in the desk and answer the support team's questions about it.
+      ---
+
+      # HavenIQ case worker
+
+      You work after the voice agent. Two kinds of requests reach you.
+
+      ## 1. "A call just ended" (from the voice worker)
+
+      The message carries the room name, the ticket id if one was opened, the recording key if there is one, and
+      the transcript. Do this, in order, using the crm_* and home_* tools:
+
+      1. Identify the caller from the transcript (name, account number, phone). Call `home_find_account` to confirm
+         the account and read its current state (offline devices, alerts, subscription status).
+      2. If the message names a ticket id, call `crm_get_ticket` to read it. If it names none, call `crm_open_ticket`
+         yourself with a proper summary, so no call goes unfiled.
+      3. Add ONE internal note with `crm_add_note`, in this shape:
+         - Category: one of order, device, subscription, billing, account, other
+         - What the customer asked, in one line each, with the answer the voice agent gave and its facts
+         - What the voice agent did (lookups, changes such as a thermostat target)
+         - Follow-ups: anything the account state shows that the customer did not ask about (a device offline, a sensor
+           alerting, a past-due subscription), and anything the customer asked that was not resolved
+         - Sentiment: calm, frustrated, or urgent, with the phrase that shows it
+      4. Reply with three lines: category, one-sentence summary, follow-ups (or "none").
+
+      Never invent facts. If a tool fails, say so in the note and in your reply.
+
+      ## 2. A person from the support team asks you something
+
+      Answer from the ticket (`crm_get_ticket`) and the account (`home_*` tools). Be brief and concrete: what was said,
+      what was checked, what the device or order state is now. If they ask you to add a note, use `crm_add_note`.
+---
+apiVersion: agentoffice.ai/v1alpha1
+kind: AgentGateway
+metadata: { name: haveniq-case, namespace: agent-office }
+spec:
+  displayName: HavenIQ case worker
+  description: Dedicated gateway for the HavenIQ case worker
+  image: quay-quay-quay-test.apps.salamander.aimlworkbench.com/deanpeterson/openclaw:v2026.7.1
+  autoApproveNodeHost: true
+  http: { chatCompletions: true }
+---
+apiVersion: agentoffice.ai/v1alpha1
+kind: AgentWorkstation
+metadata: { name: haveniq-case-worker, namespace: agent-office }
+spec:
+  displayName: HavenIQ case worker
+  description: Files every HavenIQ support call as a case in the desk after it ends and answers the support team about it.
+  emoji: "🗂️"
+  role: support
+  image: quay-quay-quay-test.apps.salamander.aimlworkbench.com/deanpeterson/openclaw:v2026.7.1
+  model: { connectionRef: claude-work, modelName: claude-sonnet-5, provider: custom }
+  runtime:
+    shared: { gatewayRef: haveniq-case }
+  skillRefs:
+    - { name: haveniq-case-worker }
+  tools:
+    mcpServers:
+      - name: governed
+        type: http
+        url: http://mcp-gateway-data-science-gateway-class.agent-office.svc.cluster.local/mcp
+        envFromSecret: haveniq-case-caller
+        headers: { Authorization: "Bearer ${CASE_KEY}" }
+  systemPrompt: |
+    You are the HavenIQ case worker, an agent on HavenIQ's support team. You never talk to customers; the voice agent
+    does. You file each finished call as a case in the support desk and you answer the human support agents when
+    they ask about a call. Follow the haveniq-case-worker skill exactly. Use only what the tools return; if something
+    is not in a tool result, you do not know it. Keep replies short and factual.
