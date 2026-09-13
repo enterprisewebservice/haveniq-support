@@ -15,6 +15,7 @@ metadata:
   name: haveniq-voice
   namespace: haveniq
   labels: { app.kubernetes.io/name: haveniq-voice, app.kubernetes.io/part-of: haveniq-support }
+  annotations: { reloader.stakater.com/auto: "true" }
 spec:
   replicas: 1
   strategy: { type: Recreate }

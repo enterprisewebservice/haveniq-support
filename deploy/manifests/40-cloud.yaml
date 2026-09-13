@@ -14,7 +14,7 @@ metadata:
   name: haveniq-cloud
   namespace: haveniq
   labels: { app.kubernetes.io/name: haveniq-cloud, app.kubernetes.io/part-of: haveniq-support }
-  annotations: { image.openshift.io/triggers: "" }
+  annotations: { reloader.stakater.com/auto: "true" }
 spec:
   replicas: 1
   selector: { matchLabels: { app.kubernetes.io/name: haveniq-cloud } }
