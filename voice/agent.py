@@ -60,7 +60,8 @@ How a call goes:
    thermostats, cameras, locks and sensors (temperatures, online status, batteries, alerts), set_thermostat to change
    a target. Say what the tool says; never invent device data. If something is offline or alerting, mention it.
 3. If the caller asks for a person, a supervisor, a human, or you cannot help (billing disputes, refunds, safety
-   emergencies, anything the tools cannot do): first call open_ticket with a clear summary of the whole call,
+   emergencies, anything the tools cannot do): first call open_ticket (title = the caller's name and the topic, e.g.
+   "Dana Whitfield: order status and thermostat, wants a person") with a clear summary of the whole call,
    then call request_handoff with that ticket id and the ROOM from CONTEXT, then call transfer_to_human with the
    same summary. The summary is for a colleague who has heard nothing: three to six sentences naming the caller
    and account number, each question asked and the answer you gave with its facts (order ids, statuses, dates,
@@ -215,17 +216,24 @@ async def entrypoint(ctx: JobContext):
 
     @session.on("function_tools_executed")
     def _on_tools(ev):
-        for call, out in zip(getattr(ev, "function_calls", []) or [], getattr(ev, "function_call_outputs", []) or []):
-            name, text = getattr(call, "name", ""), str(getattr(out, "output", "") or "")
-            m = re.search(r'"ticket_id":\s*(\d+)', text)
-            if name.endswith("open_ticket") and m:
-                state.ticket_id = int(m.group(1))
-                u = re.search(r'"ticket_url":\s*"([^"]+)"', text)
-                state.ticket_url = u.group(1) if u else ""
-                log.info("ticket %s opened", state.ticket_id)
-            if name.endswith("find_account") and '"found": true' in text.lower():
+        # tool results reach us wrapped (and sometimes repr'd), so parse leniently: quotes may be escaped
+        calls = getattr(ev, "function_calls", None) or []
+        outs = getattr(ev, "function_call_outputs", None) or []
+        for call, out in zip(calls, outs):
+            name = getattr(call, "name", "") or ""
+            text = str(getattr(out, "output", None) if out is not None else "")
+            log.info("tool %s -> %s", name, text[:160].replace("\n", " "))
+            if name.endswith("open_ticket"):
+                m = re.search(r'ticket_id\\?"?\s*:\s*(\d+)', text)
+                if m:
+                    state.ticket_id = int(m.group(1))
+                    u = re.search(r'ticket_url\\?"?\s*:\s*\\?"(https?://[^"\\\s]+)', text)
+                    state.ticket_url = u.group(1) if u else ""
+                    log.info("ticket %s opened (%s)", state.ticket_id, state.ticket_url)
+            if name.endswith("find_account") and "found" in text and "true" in text.lower():
                 try:
-                    state.account = json.loads(text)
+                    j = text[text.index("{"):text.rindex("}") + 1].encode().decode("unicode_escape")
+                    state.account = json.loads(j)
                 except Exception:
                     pass
 
@@ -268,6 +276,7 @@ async def entrypoint(ctx: JobContext):
         if time.time() - last_seen > IDLE_HANGUP_S:
             break
     log.info("call over in %s; finishing recording", ctx.room.name)
+    lines = transcript_lines(session)          # before the session closes
     try:
         await session.aclose()
     except Exception:
@@ -284,7 +293,7 @@ async def entrypoint(ctx: JobContext):
             log.warning("recording attach failed: %s", e)
     elif rec:
         log.info("recording %s kept in the bucket; no ticket was opened on this call", rec[0])
-    await file_the_call(session, ctx.room.name, state, rec)
+    await file_the_call(lines, ctx.room.name, state, rec)
     await lk.aclose()
     ctx.shutdown(reason="call over")
 
@@ -302,16 +311,17 @@ def transcript_lines(session: AgentSession) -> list[str]:
     return lines
 
 
-async def file_the_call(session: AgentSession, room: str, state: CallState, rec):
+async def file_the_call(lines: list[str], room: str, state: CallState, rec):
     """Hand the finished call to the case-worker agent (an AgentWorkstation on the platform) through its gateway's
     OpenAI-compatible face. It files the case in the desk with its own governed tools; this worker just delivers the
     transcript and moves on."""
     if not (CASE_GATEWAY_URL and CASE_GATEWAY_TOKEN):
         log.info("no case worker configured; skipping the after-call filing")
         return
-    lines = transcript_lines(session)
     if not lines:
+        log.info("no transcript captured; nothing to file")
         return
+    log.info("filing the call with the case worker (%d transcript lines)", len(lines))
     msg = (f"A call just ended.\nRoom: {room}\nTicket id: {state.ticket_id or 'none'}\nRecording: {rec[0] if rec else 'none'}\n"
            f"Account (if known): {json.dumps(state.account) if state.account else 'unknown'}\n\nTranscript:\n" + "\n".join(lines))
     try:
