@@ -17,6 +17,10 @@ secrets:
     useExisting: true
     secretName: postgresql-pass
     secretKey: postgresql-pass
+  redis:
+    useExisting: true
+    secretName: redis-pass
+    secretKey: redis-password
 zammadConfig:
   elasticsearch:
     enabled: false
