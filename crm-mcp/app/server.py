@@ -136,19 +136,22 @@ def add_note(ticket_id: int, note: str) -> dict:
         return {"ok": False, "error": str(e)}
 
 @mcp.tool()
-def request_handoff(ticket_id: int, room: str, summary: str, reason: str = "customer asked for a person") -> dict:
-    """Hand the live call to a human: raises the ticket's priority, records why, and pages the support
-    channel with the summary and a one-click link to join the caller's room. Call this AFTER open_ticket,
-    then tell the caller a person is joining and stop talking."""
+def request_handoff(room: str, summary: str, ticket_id: int = 0, reason: str = "customer asked for a person") -> dict:
+    """Hand the live call to a human: pages the support channel with the summary and a one-click link to
+    join the caller's room, and, when a ticket exists, raises its priority and records why. Call this after
+    open_ticket (pass its ticket_id; pass 0 if the ticket could not be opened), then tell the caller a person
+    is joining and stop talking."""
     join = f"{DESK_URL}/desk/join?room={room}" if DESK_URL else ""
-    try:
-        z("PUT", f"/tickets/{int(ticket_id)}", json={"state": "open", "priority": "3 high"})
-        z("POST", "/ticket_articles", json={"ticket_id": int(ticket_id), "type": "note", "internal": True, "content_type": "text/html",
-                                            "body": f"<p><b>Handoff requested:</b> {reason}</p><p>{summary.replace(chr(10), '<br>')}</p>" + (f'<p><a href="{join}">Join the live call</a></p>' if join else "")})
-    except Exception as e:
-        return {"ok": False, "error": str(e)}
-    posted = mm_post(f"**Caller waiting for a person** ({reason})\n{summary}\n\nTicket: {ticket_url(ticket_id)}" + (f"\nJoin the call: {join}" if join else ""))
-    return {"ok": True, "ticket_url": ticket_url(ticket_id), "join_url": join, "paged_channel": posted}
+    desk_note = ""
+    if ticket_id:
+        try:
+            z("PUT", f"/tickets/{int(ticket_id)}", json={"state": "open", "priority": "3 high"})
+            z("POST", "/ticket_articles", json={"ticket_id": int(ticket_id), "type": "note", "internal": True, "content_type": "text/html",
+                                                "body": f"<p><b>Handoff requested:</b> {reason}</p><p>{summary.replace(chr(10), '<br>')}</p>" + (f'<p><a href="{join}">Join the live call</a></p>' if join else "")})
+        except Exception as e:
+            desk_note = f"ticket update failed: {e}"
+    posted = mm_post(f"**Caller waiting for a person** ({reason})\n{summary}\n\n" + (f"Ticket: {ticket_url(ticket_id)}\n" if ticket_id else "No ticket could be opened; summary above.\n") + (f"Join the call: {join}" if join else ""))
+    return {"ok": True, "ticket_url": ticket_url(ticket_id) if ticket_id else "", "join_url": join, "paged_channel": posted, **({"warning": desk_note} if desk_note else {})}
 
 @mcp.tool()
 def get_ticket(ticket_id: int) -> dict:
