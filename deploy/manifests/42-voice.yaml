@@ -33,7 +33,7 @@ spec:
             - { name: LIVEKIT_URL, valueFrom: { secretKeyRef: { name: livekit-credentials, key: LIVEKIT_URL } } }
             - { name: LIVEKIT_API_KEY, valueFrom: { secretKeyRef: { name: livekit-credentials, key: LIVEKIT_API_KEY } } }
             - { name: LIVEKIT_API_SECRET, valueFrom: { secretKeyRef: { name: livekit-credentials, key: LIVEKIT_API_SECRET } } }
-            - { name: LLM_BASE_URL, value: http://guardrails-gateway.guardrails.svc.cluster.local:8090/all/v1 }
+            - { name: LLM_BASE_URL, value: http://model-desk.model-desk.svc.cluster.local:4000/v1 }   # the guardrails front door emits an empty SSE event the SDK cannot parse; the model desk streams cleanly
             - { name: LLM_API_KEY, valueFrom: { secretKeyRef: { name: model-desk-key, key: api-key } } }
             - { name: LLM_MODEL, value: gpt-4o-mini }
             - { name: GATEWAY_MCP_URL, value: http://mcp-gateway-data-science-gateway-class.agent-office.svc.cluster.local/mcp }
