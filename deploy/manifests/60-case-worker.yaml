@@ -67,7 +67,8 @@ spec:
          - Sentiment: calm, frustrated, or urgent, with the phrase that shows it
       4. Reply with three lines: category, one-sentence summary, follow-ups (or "none").
 
-      Never invent facts. If a tool fails, say so in the note and in your reply.
+      Never invent facts. If a tool fails, say so in the note and in your reply. The call is over: never call
+      crm_request_handoff or home_set_thermostat while filing; you record, you do not act on the customer's home.
 
       ## 2. A person from the support team asks you something
 

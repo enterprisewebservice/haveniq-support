@@ -74,13 +74,24 @@ def presign(key: str, hours: int = 72) -> str:
 
 # ----------------------------------------------------------------------------- customers
 def find_customer_record(phone: str = "", account_number: str = "", email: str = ""):
-    q = account_number or email or re.sub(r"\D", "", phone)[-7:]
-    if not q:
-        return None
-    for u in z("GET", "/users/search", params={"query": q, "limit": 5}):
-        if u.get("role_ids") and 3 not in u["role_ids"]:   # 3 = Customer in a default Zammad
-            pass
-        return u
+    """Find a customer by email (exact), phone (digits), or account number (kept in the user's note).
+    Zammad's database search tokenizes the query, so each candidate query is checked against the records it returns."""
+    digits = re.sub(r"\D", "", phone or "")
+    candidates = []
+    if email:
+        candidates.append((email, lambda u: (u.get("email") or "").lower() == email.lower()))
+        candidates.append((email.split("@")[0], lambda u: (u.get("email") or "").lower() == email.lower()))
+    if digits:
+        candidates.append((digits[-7:], lambda u: re.sub(r"\D", "", u.get("phone") or "").endswith(digits[-7:])))
+    if account_number:
+        candidates.append((account_number, lambda u: account_number.upper() in (u.get("note") or "").upper()))
+    for q, ok in candidates:
+        try:
+            for u in z("GET", "/users/search", params={"query": q, "limit": 10}):
+                if ok(u):
+                    return u
+        except Exception:
+            continue
     return None
 
 def ensure_customer(name: str, phone: str, email: str, account_number: str):
@@ -90,8 +101,15 @@ def ensure_customer(name: str, phone: str, email: str, account_number: str):
     if u:
         return u
     first, _, last = (name or "HavenIQ Customer").partition(" ")
-    return z("POST", "/users", json={"firstname": first, "lastname": last or "", "email": email or f"{account_number.lower()}@customers.haveniq.example",
-                                     "phone": phone, "note": f"HavenIQ account {account_number}", "roles": ["Customer"]})
+    try:
+        return z("POST", "/users", json={"firstname": first, "lastname": last or "", "email": email or f"{account_number.lower()}@customers.haveniq.example",
+                                         "phone": phone, "note": f"HavenIQ account {account_number}", "roles": ["Customer"]})
+    except RuntimeError as e:
+        if "already used" in str(e) or "422" in str(e):   # created moments ago by a parallel call: find it again
+            u = find_customer_record(phone, account_number, email)
+            if u:
+                return u
+        raise
 
 # ----------------------------------------------------------------------------- MCP tools
 mcp = FastMCP("haveniq-crm", host="0.0.0.0", port=PORT, stateless_http=True)
