@@ -1,0 +1,65 @@
+# Zammad on OpenShift, unprivileged: the chart's own Postgres/Redis/memcached/Elasticsearch subcharts are
+# OFF; the namespace runs its own Postgres, Redis and memcached (20-/21-*.yaml). No Elasticsearch: Zammad
+# falls back to database search, which is plenty for a support desk of this size. The pod runs with the
+# UID OpenShift assigns (securityContext cleared, as the chart documents for OpenShift), and the privileged
+# volume-permissions init container is disabled. Applied by an Argo Application (30-argo-app.yaml).
+image:
+  repository: ghcr.io/zammad/zammad
+securityContext: null
+ingress:
+  enabled: false
+persistence:
+  enabled: true
+  accessModes: [ReadWriteOnce]
+  size: 20Gi
+secrets:
+  postgresql:
+    useExisting: true
+    secretName: postgresql-pass
+    secretKey: postgresql-pass
+zammadConfig:
+  elasticsearch:
+    enabled: false
+    initialisation: false
+  memcached:
+    enabled: false
+    host: zammad-memcached
+    port: 11211
+  postgresql:
+    enabled: false
+    host: zammad-postgresql
+    port: 5432
+    db: zammad_production
+    user: zammad
+    options: "pool=50"
+  redis:
+    enabled: false
+    host: zammad-redis
+    port: 6379
+    username: ""
+  initContainers:
+    volumePermissions:
+      enabled: false
+    zammad:
+      securityContext:
+        runAsUser: null
+  nginx:
+    replicas: 1
+    resources: { requests: { cpu: 50m, memory: 64Mi }, limits: { cpu: "1", memory: 256Mi } }
+  railsserver:
+    replicas: 1
+    resources: { requests: { cpu: 250m, memory: 1Gi }, limits: { cpu: "2", memory: 3Gi } }
+  scheduler:
+    resources: { requests: { cpu: 100m, memory: 512Mi }, limits: { cpu: "1", memory: 2Gi } }
+  websocket:
+    resources: { requests: { cpu: 50m, memory: 256Mi }, limits: { cpu: "1", memory: 1Gi } }
+elasticsearch:
+  enabled: false
+postgresql:
+  enabled: false
+redis:
+  enabled: false
+memcached:
+  enabled: false
+minio:
+  enabled: false

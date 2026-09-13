@@ -1,0 +1,50 @@
+# haveniq-crm: the Zammad + Mattermost bridge (MCP tools behind the gateway; recording endpoint for the worker).
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata: { name: haveniq-crm, namespace: haveniq, labels: { app.kubernetes.io/part-of: haveniq-support } }
+spec:
+  source: { type: Binary }
+  strategy: { type: Docker, dockerStrategy: { dockerfilePath: crm-mcp/Containerfile } }
+  output: { to: { kind: DockerImage, name: quay-quay-quay-test.apps.salamander.aimlworkbench.com/deanpeterson/haveniq-crm:latest }, pushSecret: { name: quay-push-rhdh } }
+  resources: { requests: { cpu: 250m, memory: 512Mi }, limits: { memory: 2Gi } }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: haveniq-crm
+  namespace: haveniq
+  labels: { app.kubernetes.io/name: haveniq-crm, app.kubernetes.io/part-of: haveniq-support }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app.kubernetes.io/name: haveniq-crm } }
+  template:
+    metadata: { labels: { app.kubernetes.io/name: haveniq-crm } }
+    spec:
+      containers:
+        - name: crm
+          image: quay-quay-quay-test.apps.salamander.aimlworkbench.com/deanpeterson/haveniq-crm:latest
+          imagePullPolicy: Always
+          env:
+            - { name: ZAMMAD_URL, value: http://zammad-nginx.haveniq.svc:8080 }
+            - { name: ZAMMAD_PUBLIC_URL, value: https://zammad-haveniq.apps.salamander.aimlworkbench.com }
+            - { name: ZAMMAD_GROUP, value: Users }
+            - { name: ZAMMAD_TOKEN, valueFrom: { secretKeyRef: { name: zammad-api-token, key: ZAMMAD_TOKEN, optional: true } } }
+            - { name: MM_URL, value: http://mattermost.mattermost.svc.cluster.local:8065 }
+            - { name: MM_TOKEN, valueFrom: { secretKeyRef: { name: mattermost-token, key: token, optional: true } } }
+            - { name: MM_TEAM, value: agents }
+            - { name: MM_CHANNEL, value: haveniq-support }
+            - { name: DESK_URL, value: https://haveniq.apps.salamander.aimlworkbench.com }
+            - { name: S3_ENDPOINT, value: https://s3-openshift-storage.apps.salamander.aimlworkbench.com }
+            - { name: S3_BUCKET, valueFrom: { configMapKeyRef: { name: haveniq-recordings, key: BUCKET_NAME, optional: true } } }
+            - { name: AWS_ACCESS_KEY_ID, valueFrom: { secretKeyRef: { name: haveniq-recordings, key: AWS_ACCESS_KEY_ID, optional: true } } }
+            - { name: AWS_SECRET_ACCESS_KEY, valueFrom: { secretKeyRef: { name: haveniq-recordings, key: AWS_SECRET_ACCESS_KEY, optional: true } } }
+          ports: [{ containerPort: 8080, name: http }]
+          readinessProbe: { httpGet: { path: /healthz, port: 8080 }, initialDelaySeconds: 5, periodSeconds: 10 }
+          resources: { requests: { cpu: 50m, memory: 128Mi }, limits: { cpu: "1", memory: 768Mi } }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: haveniq-crm, namespace: haveniq, labels: { app.kubernetes.io/name: haveniq-crm } }
+spec:
+  selector: { app.kubernetes.io/name: haveniq-crm }
+  ports: [{ name: http, port: 8080, targetPort: 8080 }]

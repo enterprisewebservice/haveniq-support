@@ -1,0 +1,61 @@
+# The two HavenIQ tool servers join the platform's MCP gateway like every other governed tool: an HTTPRoute
+# on the gateway's `mcps` listener (in the gateway's namespace) pointing at the Service here, allowed by a
+# ReferenceGrant, and an MCPServerRegistration the broker discovers tools from. Prefixes: home_* and crm_*.
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: ReferenceGrant
+metadata: { name: mcp-gateway-to-haveniq, namespace: haveniq }
+spec:
+  from:
+    - { group: gateway.networking.k8s.io, kind: HTTPRoute, namespace: agent-office }
+  to:
+    - { group: "", kind: Service }
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: haveniq-cloud-route
+  namespace: agent-office
+  labels: { app.kubernetes.io/name: haveniq-cloud, app.kubernetes.io/component: backend-route }
+spec:
+  parentRefs: [{ group: gateway.networking.k8s.io, kind: Gateway, name: mcp-gateway, namespace: agent-office, sectionName: mcps }]
+  hostnames: [haveniq-cloud.mcp.local]
+  rules:
+    - matches: [{ path: { type: PathPrefix, value: /mcp } }]
+      backendRefs: [{ name: haveniq-cloud, namespace: haveniq, port: 8080 }]
+---
+apiVersion: mcp.kuadrant.io/v1alpha1
+kind: MCPServerRegistration
+metadata:
+  name: haveniq-cloud
+  namespace: agent-office
+  labels: { app.kubernetes.io/name: haveniq-cloud, app.kubernetes.io/component: registration }
+spec:
+  prefix: home_
+  path: /mcp
+  targetRef: { group: gateway.networking.k8s.io, kind: HTTPRoute, name: haveniq-cloud-route }
+  credentialRef: { name: github-mcp-broker-token, key: AUTHORIZATION }
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: haveniq-crm-route
+  namespace: agent-office
+  labels: { app.kubernetes.io/name: haveniq-crm, app.kubernetes.io/component: backend-route }
+spec:
+  parentRefs: [{ group: gateway.networking.k8s.io, kind: Gateway, name: mcp-gateway, namespace: agent-office, sectionName: mcps }]
+  hostnames: [haveniq-crm.mcp.local]
+  rules:
+    - matches: [{ path: { type: PathPrefix, value: /mcp } }]
+      backendRefs: [{ name: haveniq-crm, namespace: haveniq, port: 8080 }]
+---
+apiVersion: mcp.kuadrant.io/v1alpha1
+kind: MCPServerRegistration
+metadata:
+  name: haveniq-crm
+  namespace: agent-office
+  labels: { app.kubernetes.io/name: haveniq-crm, app.kubernetes.io/component: registration }
+spec:
+  prefix: crm_
+  path: /mcp
+  targetRef: { group: gateway.networking.k8s.io, kind: HTTPRoute, name: haveniq-crm-route }
+  credentialRef: { name: github-mcp-broker-token, key: AUTHORIZATION }

@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HavenIQ Support</title>
+<style>
+  :root { --ink:#13233d; --muted:#5a6a85; --line:#e4e9f2; --accent:#0f7c6b; --bg:#f6f8fb; }
+  * { box-sizing:border-box; margin:0; padding:0 }
+  body { font-family: -apple-system, "Segoe UI", Roboto, sans-serif; color:var(--ink); background:var(--bg); }
+  main { max-width:560px; margin:8vh auto; padding:0 1.2rem; }
+  .card { background:#fff; border:1px solid var(--line); border-radius:16px; padding:1.6rem 1.8rem; }
+  h1 { font-size:1.6rem; margin-bottom:.3rem } p { color:var(--muted); line-height:1.5 }
+  label { display:block; font-size:.85rem; color:var(--muted); margin:1.2rem 0 .3rem }
+  input { width:100%; padding:.7rem .8rem; border:1px solid var(--line); border-radius:10px; font-size:1rem }
+  button { margin-top:1.2rem; width:100%; padding:.9rem; border:0; border-radius:12px; background:var(--accent); color:#fff; font-size:1.05rem; font-weight:600; cursor:pointer }
+  button[disabled] { opacity:.5; cursor:default }
+  .status { margin-top:1rem; font-size:.95rem; color:var(--muted); min-height:1.4em }
+  .live { color:var(--accent); font-weight:600 }
+  .hint { font-size:.8rem; margin-top:1.4rem }
+  #transcript { margin-top:1rem; max-height:220px; overflow:auto; font-size:.9rem; line-height:1.45; border-top:1px solid var(--line); padding-top:.8rem }
+  #transcript .u { color:var(--ink) } #transcript .a { color:var(--accent) }
+</style>
+</head>
+<body>
+<main>
+  <div class="card">
+    <h1>HavenIQ Support</h1>
+    <p>Talk to our support agent. Have your phone number or account number ready.</p>
+    <label for="phone">Phone number on the account (optional)</label>
+    <input id="phone" placeholder="+1 612 555 0142" autocomplete="tel">
+    <button id="callBtn">Start call</button>
+    <div class="status" id="status"></div>
+    <div id="transcript"></div>
+    <p class="hint">Sample accounts: Dana Whitfield +1 612 555 0142 · Marcus Odum +1 415 555 0198 · Priya Raman +1 737 555 0117</p>
+  </div>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/livekit-client@2/dist/livekit-client.umd.min.js"></script>
+<script>
+(async () => {
+  const LK = window.LivekitClient; const $ = id => document.getElementById(id);
+  let room = null;
+  const line = (who, text) => { const d = document.createElement('div'); d.className = who; d.textContent = (who==='u'?'You: ':'Agent: ') + text; $('transcript').appendChild(d); $('transcript').scrollTop = 1e9; };
+  $('callBtn').onclick = async () => {
+    if (room) { await room.disconnect(); room = null; $('callBtn').textContent = 'Start call'; $('status').textContent = 'Call ended.'; return; }
+    $('callBtn').disabled = true; $('status').textContent = 'Connecting…';
+    try {
+      const r = await fetch('/api/call/token', { method: 'POST', headers: {'content-type':'application/json'}, body: JSON.stringify({ phone: $('phone').value }) });
+      const j = await r.json(); if (!j.ok) throw new Error(j.error || 'no token');
+      room = new LK.Room({ adaptiveStream: true, dynacast: true });
+      room.on(LK.RoomEvent.TrackSubscribed, (track) => { if (track.kind === 'audio') { const el = track.attach(); el.autoplay = true; document.body.appendChild(el); } });
+      room.on(LK.RoomEvent.TranscriptionReceived, (segs, p) => { for (const s of segs) if (s.final) line(p && p.identity && p.identity.startsWith('caller-') ? 'u' : 'a', s.text); });
+      room.on(LK.RoomEvent.ParticipantConnected, (p) => { if (p.identity.startsWith('human-')) $('status').innerHTML = '<span class="live">A support agent has joined the call.</span>'; });
+      room.on(LK.RoomEvent.Disconnected, () => { $('status').textContent = 'Call ended.'; $('callBtn').textContent = 'Start call'; room = null; });
+      await room.connect(j.url, j.token);
+      await room.localParticipant.setMicrophoneEnabled(true);
+      $('status').innerHTML = '<span class="live">Connected.</span> Room ' + j.room + '. The agent will greet you in a moment.';
+      $('callBtn').textContent = 'End call';
+    } catch (e) { $('status').textContent = 'Could not start the call: ' + e.message; room = null; }
+    $('callBtn').disabled = false;
+  };
+})();
+</script>
+</body>
+</html>

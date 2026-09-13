@@ -1,0 +1,49 @@
+# haveniq-voice: the LiveKit Agents worker. Dials out to LiveKit Cloud; talks to the model desk through the
+# guardrailed front door; every tool call goes to the MCP gateway with its own generated caller key.
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata: { name: haveniq-voice, namespace: haveniq, labels: { app.kubernetes.io/part-of: haveniq-support } }
+spec:
+  source: { type: Binary }
+  strategy: { type: Docker, dockerStrategy: { dockerfilePath: voice/Dockerfile } }
+  output: { to: { kind: DockerImage, name: quay-quay-quay-test.apps.salamander.aimlworkbench.com/deanpeterson/haveniq-voice:latest }, pushSecret: { name: quay-push-rhdh } }
+  resources: { requests: { cpu: 500m, memory: 1Gi }, limits: { memory: 4Gi } }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: haveniq-voice
+  namespace: haveniq
+  labels: { app.kubernetes.io/name: haveniq-voice, app.kubernetes.io/part-of: haveniq-support }
+spec:
+  replicas: 1
+  strategy: { type: Recreate }
+  selector: { matchLabels: { app.kubernetes.io/name: haveniq-voice } }
+  template:
+    metadata: { labels: { app.kubernetes.io/name: haveniq-voice } }
+    spec:
+      terminationGracePeriodSeconds: 300
+      containers:
+        - name: worker
+          image: quay-quay-quay-test.apps.salamander.aimlworkbench.com/deanpeterson/haveniq-voice:latest
+          imagePullPolicy: Always
+          env:
+            - { name: AGENT_NAME, value: haveniq-support }
+            - { name: LIVEKIT_URL, valueFrom: { secretKeyRef: { name: livekit-credentials, key: LIVEKIT_URL } } }
+            - { name: LIVEKIT_API_KEY, valueFrom: { secretKeyRef: { name: livekit-credentials, key: LIVEKIT_API_KEY } } }
+            - { name: LIVEKIT_API_SECRET, valueFrom: { secretKeyRef: { name: livekit-credentials, key: LIVEKIT_API_SECRET } } }
+            - { name: LLM_BASE_URL, value: http://guardrails-gateway.guardrails.svc.cluster.local:8090/all/v1 }
+            - { name: LLM_API_KEY, valueFrom: { secretKeyRef: { name: model-desk-key, key: api-key } } }
+            - { name: LLM_MODEL, value: gpt-4o-mini }
+            - { name: GATEWAY_MCP_URL, value: http://mcp-gateway-data-science-gateway-class.agent-office.svc.cluster.local/mcp }
+            - { name: GATEWAY_CALLER_KEY, valueFrom: { secretKeyRef: { name: haveniq-voice-caller, key: api_key } } }
+            - { name: CLOUD_URL, value: http://haveniq-cloud.haveniq.svc:8080 }
+            - { name: CRM_URL, value: http://haveniq-crm.haveniq.svc:8080 }
+            - { name: DESK_PUBLIC_URL, value: https://haveniq.apps.salamander.aimlworkbench.com }
+            - { name: STT_MODEL, value: deepgram/nova-3 }
+            - { name: TTS_VOICE, value: "inworld/inworld-tts-2:Ashley" }
+            - { name: S3_ENDPOINT, value: https://s3-openshift-storage.apps.salamander.aimlworkbench.com }
+            - { name: S3_BUCKET, valueFrom: { configMapKeyRef: { name: haveniq-recordings, key: BUCKET_NAME, optional: true } } }
+            - { name: AWS_ACCESS_KEY_ID, valueFrom: { secretKeyRef: { name: haveniq-recordings, key: AWS_ACCESS_KEY_ID, optional: true } } }
+            - { name: AWS_SECRET_ACCESS_KEY, valueFrom: { secretKeyRef: { name: haveniq-recordings, key: AWS_SECRET_ACCESS_KEY, optional: true } } }
+          resources: { requests: { cpu: 500m, memory: 1Gi }, limits: { cpu: "2", memory: 3Gi } }

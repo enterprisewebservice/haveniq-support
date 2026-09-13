@@ -1,0 +1,5 @@
+# mcp 2.x moved FastMCP; keep the 1.x line the platform's other tool servers run on.
+mcp>=1.29,<2
+fastapi>=0.110
+uvicorn>=0.29
+livekit-api>=1.0

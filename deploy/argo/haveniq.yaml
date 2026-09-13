@@ -1,0 +1,52 @@
+# Bootstrap (applied once by hand): the Argo project and the two Applications. Everything else is synced
+# from the repository. The project may deploy to haveniq (the app), agent-office and upstreambeat (the
+# gateway registrations and the secret-mirror grants) and create the namespace itself.
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata: { name: haveniq, namespace: openshift-gitops }
+spec:
+  description: HavenIQ voice support demo
+  sourceRepos:
+    - https://github.com/enterprisewebservice/haveniq-support.git
+    - https://zammad.github.io/zammad-helm
+  destinations:
+    - { namespace: haveniq, server: https://kubernetes.default.svc }
+    - { namespace: agent-office, server: https://kubernetes.default.svc }
+    - { namespace: upstreambeat, server: https://kubernetes.default.svc }
+  clusterResourceWhitelist: [{ group: "", kind: Namespace }]
+  namespaceResourceWhitelist: [{ group: "*", kind: "*" }]
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata: { name: haveniq-support, namespace: openshift-gitops }
+spec:
+  project: haveniq
+  source:
+    repoURL: https://github.com/enterprisewebservice/haveniq-support.git
+    targetRevision: main
+    path: deploy/manifests
+    directory: { recurse: true }
+  destination: { server: https://kubernetes.default.svc, namespace: haveniq }
+  syncPolicy:
+    automated: { prune: true, selfHeal: false }
+    syncOptions: [CreateNamespace=true, ServerSideApply=true]
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata: { name: haveniq-zammad, namespace: openshift-gitops }
+spec:
+  project: haveniq
+  sources:
+    - repoURL: https://zammad.github.io/zammad-helm
+      chart: zammad
+      targetRevision: 18.0.5
+      helm:
+        releaseName: zammad
+        valueFiles: [$values/deploy/zammad-chart/values.yaml]
+    - repoURL: https://github.com/enterprisewebservice/haveniq-support.git
+      targetRevision: main
+      ref: values
+  destination: { server: https://kubernetes.default.svc, namespace: haveniq }
+  syncPolicy:
+    automated: { prune: true, selfHeal: false }
+    syncOptions: [ServerSideApply=true]

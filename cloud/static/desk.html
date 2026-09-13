@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HavenIQ Support Desk</title>
+<style>
+  :root { --ink:#13233d; --muted:#5a6a85; --line:#e4e9f2; --accent:#0f7c6b; --bg:#f6f8fb; --warn:#b54708 }
+  * { box-sizing:border-box; margin:0; padding:0 }
+  body { font-family: -apple-system, "Segoe UI", Roboto, sans-serif; color:var(--ink); background:var(--bg); }
+  main { max-width:820px; margin:5vh auto; padding:0 1.2rem; display:grid; gap:1rem }
+  .card { background:#fff; border:1px solid var(--line); border-radius:16px; padding:1.4rem 1.6rem }
+  h1 { font-size:1.4rem } h2 { font-size:1rem; color:var(--muted); font-weight:600; margin-bottom:.5rem; text-transform:uppercase; letter-spacing:.04em }
+  p, li { line-height:1.5 } .muted { color:var(--muted) }
+  pre { white-space:pre-wrap; font-family:inherit; line-height:1.5 }
+  .row { display:flex; gap:1rem; flex-wrap:wrap } .row > div { flex:1 1 220px }
+  button { padding:.8rem 1.2rem; border:0; border-radius:12px; background:var(--accent); color:#fff; font-size:1rem; font-weight:600; cursor:pointer }
+  a.btn { display:inline-block; padding:.6rem 1rem; border-radius:10px; border:1px solid var(--line); text-decoration:none; color:var(--ink) }
+  .status { margin-top:.8rem; color:var(--muted) }
+  .pill { display:inline-block; padding:.15rem .6rem; border-radius:999px; background:#eef6f4; color:var(--accent); font-size:.85rem; font-weight:600 }
+</style>
+</head>
+<body>
+<main>
+  <div class="card">
+    <h1>Incoming handoff <span class="pill" id="room"></span></h1>
+    <p class="muted">The voice agent handed this caller to you. Read the summary, then join the call. The caller hears you the moment you connect.</p>
+    <div class="status" id="status"></div>
+    <div style="margin-top:1rem; display:flex; gap:.8rem; align-items:center; flex-wrap:wrap">
+      <input id="name" placeholder="Your name" style="padding:.7rem .8rem; border:1px solid var(--line); border-radius:10px; font-size:1rem" value="Ahmad">
+      <button id="joinBtn">Join the call</button>
+      <a class="btn" id="ticket" href="#" target="_blank" hidden>Open ticket</a>
+      <a class="btn" id="recording" href="#" target="_blank" hidden>Recording</a>
+    </div>
+  </div>
+  <div class="row">
+    <div class="card"><h2>Call summary</h2><pre id="summary">Loading…</pre></div>
+    <div class="card"><h2>Customer</h2><pre id="account">Loading…</pre></div>
+  </div>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/livekit-client@2/dist/livekit-client.umd.min.js"></script>
+<script>
+(async () => {
+  const LK = window.LivekitClient; const $ = id => document.getElementById(id);
+  const room = new URLSearchParams(location.search).get('room') || '';
+  $('room').textContent = room;
+  const h = await (await fetch('/api/handoff?room=' + encodeURIComponent(room))).json();
+  $('summary').textContent = h.summary || '(none)';
+  $('account').textContent = h.account ? Object.entries(h.account).map(([k,v]) => k + ': ' + (typeof v === 'object' ? JSON.stringify(v) : v)).join('\n') : '(unknown caller)';
+  if (h.ticket_url) { $('ticket').href = h.ticket_url; $('ticket').hidden = false; }
+  if (h.recording_url) { $('recording').href = h.recording_url; $('recording').hidden = false; }
+  let lk = null;
+  $('joinBtn').onclick = async () => {
+    if (lk) { await lk.disconnect(); lk = null; $('joinBtn').textContent = 'Join the call'; $('status').textContent = 'Left the call.'; return; }
+    $('status').textContent = 'Joining…';
+    const r = await fetch('/api/desk/token', { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ room, name: $('name').value }) });
+    const j = await r.json(); if (!j.ok) { $('status').textContent = 'Could not join: ' + (j.error||''); return; }
+    lk = new LK.Room();
+    lk.on(LK.RoomEvent.TrackSubscribed, (t) => { if (t.kind === 'audio') { const el = t.attach(); el.autoplay = true; document.body.appendChild(el); } });
+    await lk.connect(j.url, j.token); await lk.localParticipant.setMicrophoneEnabled(true);
+    $('status').textContent = 'You are on the call. The agent has stepped back; the recording continues.';
+    $('joinBtn').textContent = 'Leave the call';
+  };
+})();
+</script>
+</body>
+</html>

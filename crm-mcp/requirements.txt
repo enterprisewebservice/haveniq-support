@@ -1,0 +1,5 @@
+mcp>=1.29,<2
+fastapi>=0.110
+uvicorn>=0.29
+requests>=2.32
+boto3>=1.35

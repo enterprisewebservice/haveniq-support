@@ -1,0 +1,12 @@
+# The human support agents work in Zammad. Edge TLS on the cluster's wildcard.
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: zammad
+  namespace: haveniq
+  labels: { app.kubernetes.io/part-of: haveniq-support }
+spec:
+  host: zammad-haveniq.apps.salamander.aimlworkbench.com
+  to: { kind: Service, name: zammad-nginx }
+  port: { targetPort: 8080 }
+  tls: { termination: edge, insecureEdgeTerminationPolicy: Redirect }

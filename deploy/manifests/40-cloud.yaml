@@ -1,0 +1,52 @@
+# haveniq-cloud: the customer/device cloud (MCP tools behind the gateway) + the caller and desk pages.
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata: { name: haveniq-cloud, namespace: haveniq, labels: { app.kubernetes.io/part-of: haveniq-support } }
+spec:
+  source: { type: Binary }
+  strategy: { type: Docker, dockerStrategy: { dockerfilePath: cloud/Containerfile } }
+  output: { to: { kind: DockerImage, name: quay-quay-quay-test.apps.salamander.aimlworkbench.com/deanpeterson/haveniq-cloud:latest }, pushSecret: { name: quay-push-rhdh } }
+  resources: { requests: { cpu: 250m, memory: 512Mi }, limits: { memory: 2Gi } }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: haveniq-cloud
+  namespace: haveniq
+  labels: { app.kubernetes.io/name: haveniq-cloud, app.kubernetes.io/part-of: haveniq-support }
+  annotations: { image.openshift.io/triggers: "" }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app.kubernetes.io/name: haveniq-cloud } }
+  template:
+    metadata: { labels: { app.kubernetes.io/name: haveniq-cloud } }
+    spec:
+      containers:
+        - name: cloud
+          image: quay-quay-quay-test.apps.salamander.aimlworkbench.com/deanpeterson/haveniq-cloud:latest
+          imagePullPolicy: Always
+          env:
+            - { name: AGENT_NAME, value: haveniq-support }
+            - { name: PUBLIC_URL, value: https://haveniq.apps.salamander.aimlworkbench.com }
+            - { name: LIVEKIT_URL, valueFrom: { secretKeyRef: { name: livekit-credentials, key: LIVEKIT_URL, optional: true } } }
+            - { name: LIVEKIT_API_KEY, valueFrom: { secretKeyRef: { name: livekit-credentials, key: LIVEKIT_API_KEY, optional: true } } }
+            - { name: LIVEKIT_API_SECRET, valueFrom: { secretKeyRef: { name: livekit-credentials, key: LIVEKIT_API_SECRET, optional: true } } }
+          ports: [{ containerPort: 8080, name: http }]
+          readinessProbe: { httpGet: { path: /healthz, port: 8080 }, initialDelaySeconds: 5, periodSeconds: 10 }
+          resources: { requests: { cpu: 50m, memory: 128Mi }, limits: { cpu: "1", memory: 512Mi } }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: haveniq-cloud, namespace: haveniq, labels: { app.kubernetes.io/name: haveniq-cloud } }
+spec:
+  selector: { app.kubernetes.io/name: haveniq-cloud }
+  ports: [{ name: http, port: 8080, targetPort: 8080 }]
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata: { name: haveniq, namespace: haveniq, labels: { app.kubernetes.io/part-of: haveniq-support } }
+spec:
+  host: haveniq.apps.salamander.aimlworkbench.com
+  to: { kind: Service, name: haveniq-cloud }
+  port: { targetPort: 8080 }
+  tls: { termination: edge, insecureEdgeTerminationPolicy: Redirect }

@@ -1,0 +1,58 @@
+# Zammad's Redis (ActionCable/websocket fan-out) and memcached (Rails cache). Redis is the Red Hat
+# rhel9 image OpenShift GitOps itself runs on; memcached is the upstream image (no auth, in-namespace only).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: zammad-redis
+  namespace: haveniq
+  labels: { app.kubernetes.io/name: zammad-redis, app.kubernetes.io/part-of: haveniq-support }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app.kubernetes.io/name: zammad-redis } }
+  template:
+    metadata: { labels: { app.kubernetes.io/name: zammad-redis } }
+    spec:
+      containers:
+        - name: redis
+          image: registry.redhat.io/rhel9/redis-7:latest
+          ports: [{ containerPort: 6379, name: redis }]
+          readinessProbe: { tcpSocket: { port: 6379 }, initialDelaySeconds: 5, periodSeconds: 10 }
+          resources: { requests: { cpu: 50m, memory: 64Mi }, limits: { cpu: 500m, memory: 512Mi } }
+          volumeMounts: [{ name: data, mountPath: /var/lib/redis/data }]
+      volumes:
+        - name: data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata: { name: zammad-redis, namespace: haveniq }
+spec:
+  selector: { app.kubernetes.io/name: zammad-redis }
+  ports: [{ name: redis, port: 6379, targetPort: 6379 }]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: zammad-memcached
+  namespace: haveniq
+  labels: { app.kubernetes.io/name: zammad-memcached, app.kubernetes.io/part-of: haveniq-support }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app.kubernetes.io/name: zammad-memcached } }
+  template:
+    metadata: { labels: { app.kubernetes.io/name: zammad-memcached } }
+    spec:
+      containers:
+        - name: memcached
+          image: docker.io/library/memcached:1.6-alpine
+          args: ["-m", "256"]
+          ports: [{ containerPort: 11211, name: memcached }]
+          readinessProbe: { tcpSocket: { port: 11211 }, initialDelaySeconds: 3, periodSeconds: 10 }
+          resources: { requests: { cpu: 50m, memory: 64Mi }, limits: { cpu: 500m, memory: 320Mi } }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: zammad-memcached, namespace: haveniq }
+spec:
+  selector: { app.kubernetes.io/name: zammad-memcached }
+  ports: [{ name: memcached, port: 11211, targetPort: 11211 }]

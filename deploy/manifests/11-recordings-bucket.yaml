@@ -1,0 +1,12 @@
+# Call recordings live in the cluster's own object store. The claim yields a bucket plus a Secret
+# (AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY) and a ConfigMap (BUCKET_NAME) named after the claim.
+# LiveKit Egress (cloud) writes into it through the public S3 route; the desk and Zammad get
+# presigned links; nothing secret is typed by a human.
+apiVersion: objectbucket.io/v1alpha1
+kind: ObjectBucketClaim
+metadata:
+  name: haveniq-recordings
+  namespace: haveniq
+spec:
+  generateBucketName: haveniq-recordings
+  storageClassName: openshift-storage.noobaa.io

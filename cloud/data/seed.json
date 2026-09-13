@@ -1,0 +1,61 @@
+{
+  "accounts": [
+    {
+      "account_number": "HQ-10421", "name": "Dana Whitfield", "phone": "+1 612 555 0142", "email": "dana.whitfield@example.com",
+      "address": "418 Lakeview Ave, Minneapolis, MN",
+      "subscription": {"tier": "HavenIQ Plus", "status": "active", "renews": "2026-10-01", "cloud_video_days": 30},
+      "devices": [
+        {"id": "th-2201", "type": "thermostat", "name": "Living room thermostat", "room": "Living room", "online": true,
+         "state": {"mode": "cool", "target_f": 72, "current_f": 74, "humidity_pct": 41, "fan": "auto"}},
+        {"id": "th-2202", "type": "thermostat", "name": "Upstairs thermostat", "room": "Upstairs hallway", "online": true,
+         "state": {"mode": "cool", "target_f": 70, "current_f": 71, "humidity_pct": 44, "fan": "auto"}},
+        {"id": "cam-5510", "type": "camera", "name": "Front door camera", "room": "Front door", "online": true,
+         "state": {"recording": true, "battery_pct": 88, "last_motion": "2026-09-12T18:42:00Z"}},
+        {"id": "lock-7301", "type": "door lock", "name": "Front door lock", "room": "Front door", "online": true,
+         "state": {"locked": true, "battery_pct": 61}},
+        {"id": "sen-8804", "type": "leak sensor", "name": "Kitchen leak sensor", "room": "Kitchen", "online": true,
+         "state": {"alert": false, "battery_pct": 97}}
+      ],
+      "orders": [
+        {"order_id": "ORD-88213", "placed": "2026-09-08", "items": ["Indoor camera, 2-pack"], "total_usd": 149.00,
+         "status": "shipped", "carrier": "UPS", "tracking": "1Z 84A 221 03 9871 2242", "eta": "2026-09-14"},
+        {"order_id": "ORD-86720", "placed": "2026-07-19", "items": ["Smart thermostat", "Thermostat mounting plate"], "total_usd": 219.00,
+         "status": "delivered", "carrier": "UPS", "tracking": "1Z 84A 221 03 5512 0084", "delivered": "2026-07-23"}
+      ]
+    },
+    {
+      "account_number": "HQ-20877", "name": "Marcus Odum", "phone": "+1 415 555 0198", "email": "marcus.odum@example.com",
+      "address": "77 Harbor St, San Francisco, CA",
+      "subscription": {"tier": "HavenIQ Basic", "status": "past due", "renews": "2026-09-05", "cloud_video_days": 7},
+      "devices": [
+        {"id": "th-3310", "type": "thermostat", "name": "Living room thermostat", "room": "Living room", "online": false,
+         "state": {"mode": "heat", "target_f": 68, "current_f": null, "humidity_pct": null, "fan": "auto", "last_seen": "2026-09-10T02:15:00Z"}},
+        {"id": "cam-6621", "type": "camera", "name": "Backyard camera", "room": "Backyard", "online": true,
+         "state": {"recording": false, "battery_pct": 23, "last_motion": "2026-09-12T11:05:00Z"}},
+        {"id": "lock-7419", "type": "door lock", "name": "Garage door lock", "room": "Garage", "online": true,
+         "state": {"locked": false, "battery_pct": 79}}
+      ],
+      "orders": [
+        {"order_id": "ORD-88401", "placed": "2026-09-11", "items": ["Camera battery pack"], "total_usd": 39.00,
+         "status": "processing", "carrier": null, "tracking": null, "eta": "2026-09-16"}
+      ]
+    },
+    {
+      "account_number": "HQ-30512", "name": "Priya Raman", "phone": "+1 737 555 0117", "email": "priya.raman@example.com",
+      "address": "1200 Barton Springs Rd, Austin, TX",
+      "subscription": {"tier": "HavenIQ Plus", "status": "active", "renews": "2027-01-15", "cloud_video_days": 30},
+      "devices": [
+        {"id": "th-4402", "type": "thermostat", "name": "Living room thermostat", "room": "Living room", "online": true,
+         "state": {"mode": "cool", "target_f": 75, "current_f": 78, "humidity_pct": 55, "fan": "on"}},
+        {"id": "cam-7730", "type": "camera", "name": "Nursery camera", "room": "Nursery", "online": true,
+         "state": {"recording": true, "battery_pct": 100, "last_motion": "2026-09-12T19:20:00Z"}},
+        {"id": "sen-9915", "type": "leak sensor", "name": "Laundry leak sensor", "room": "Laundry room", "online": true,
+         "state": {"alert": true, "battery_pct": 90, "alert_since": "2026-09-12T17:58:00Z"}}
+      ],
+      "orders": [
+        {"order_id": "ORD-87950", "placed": "2026-08-30", "items": ["Smart door lock"], "total_usd": 199.00,
+         "status": "delivered", "carrier": "FedEx", "tracking": "7489 2201 0093", "delivered": "2026-09-03"}
+      ]
+    }
+  ]
+}
