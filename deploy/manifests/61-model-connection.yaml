@@ -1,0 +1,36 @@
+# A brain route for the case worker. See the description inside; the guardrails front door stays the route for people.
+apiVersion: agentoffice.ai/v1alpha1
+kind: ModelConnection
+metadata:
+  name: claude-direct
+  namespace: agent-office
+spec:
+  access:
+    groups:
+    - redhat-attendees
+    - redhat-workshop-users
+    - model-admins
+    users:
+    - deanpeterson
+  api: openai-completions
+  apiKeySecretRef:
+    key: api-key
+    name: model-desk-agent-key
+    namespace: agent-office
+  baseUrl: http://model-desk.model-desk.svc.cluster.local:4000/v1
+  description: 'Same models and key as claude-work, straight to the model desk: for
+    platform agents whose runtime sends structured message content the guardrails
+    orchestrator rejects (422 ''Detection on array is not supported''). Human-facing
+    chat keeps the guardrailed route.'
+  displayName: Claude, direct to the model desk
+  keyStrategy: shared
+  kind: endpoint
+  models:
+  - id: claude-sonnet-5
+    name: Claude Sonnet 5
+  - id: claude-opus-4-6
+    name: Claude Opus 4.6
+  - id: claude-sonnet-4-5
+    name: Claude Sonnet 4.5
+  - id: claude-haiku-4-5
+    name: Claude Haiku 4.5
