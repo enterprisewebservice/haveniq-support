@@ -44,3 +44,14 @@ oc exec -n vault vault-0 -- vault kv put agent-office/haveniq-zammad ZAMMAD_TOKE
 
 Test without a microphone: `lk dispatch create --new-room --agent-name haveniq-support --metadata '{"phone":"+1 612 555 0142"}'`,
 then join the room with a token and type in LiveKit Meet's chat; the worker treats typed text as speech.
+
+## The case worker
+
+A second agent, declared the framework way in `deploy/manifests/60-case-worker.yaml`: an AgentGateway, an AgentWorkstation
+with its own generated gateway caller key, and a Skill artifact that says how to file a call. When a call ends the voice
+worker posts the transcript to the case worker's OpenAI-compatible face; the case worker confirms the account, opens the
+ticket if the voice agent could not, adds one structured note (category, questions and answers with their facts, actions,
+follow-ups from the account state, sentiment) and replies with a three-line filing. Support staff can also ask it about a
+call in its Mattermost channel. Its brain is the `claude-direct` ModelConnection (`61-model-connection.yaml`): the same
+models and key as `claude-work`, straight to the model desk, because the guardrails orchestrator rejects the structured
+message content the openclaw runtime sends.

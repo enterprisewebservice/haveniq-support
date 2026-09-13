@@ -61,6 +61,8 @@ box(s,3.0,5.95,2.6,1.0,"HavenIQ cloud","accounts, devices, orders (mock)",WHITE,
 box(s,6.1,5.95,2.6,1.0,"CRM bridge","tickets, notes, handoff page",WHITE,LINE,12,10)
 box(s,9.2,5.95,2.0,1.0,"Zammad","the support team's desk",WHITE,LINE,12,10)
 box(s,9.4,4.55,3.3,1.15,"Object store (NooBaa)","call recording, attached to the ticket",WHITE,LINE,12,10)
+box(s,0.6,5.95,2.0,1.0,"Case worker agent","files the call after it ends; answers the team in chat",SOFT,LINE,12,9)
+arrow(s,2.6,6.45,3.0,6.45,"")
 box(s,0.6,4.55,2.0,1.15,"Human agent","joins the same room from the desk with the summary",SOFT,LINE,12,10)
 arrow(s,2.6,3.05,3.2,3.05,"audio"); arrow(s,5.4,3.05,6.1,3.05,"dispatch"); arrow(s,8.7,3.05,9.4,3.05,"turns")
 arrow(s,7.4,3.9,7.4,4.55,"tool calls"); arrow(s,6.1,5.12,4.3,5.95,""); arrow(s,7.4,5.7,7.4,5.95,""); arrow(s,8.7,6.45,9.2,6.45,"API")
@@ -71,7 +73,7 @@ text(s,0.7,0.7,11.9,0.8,"The call you are about to hear",36,True,INK,font=HD)
 steps=[("1  Greet by name","The caller's number arrives with the call. The agent looks the account up through the gateway before the first word and greets Dana by name."),
        ("2  Answer from the source","Order status, thermostat status, living-room temperature: each answer is a governed tool call to HavenIQ's cloud, never a guess."),
        ("3  Hand off with the story","When Dana asks for a person, the agent opens the ticket with a summary, pages the desk, and a human joins the same room already briefed."),
-       ("4  Close the loop","The recording lands in HavenIQ's own object store and is attached to the ticket, so the follow-up has both the summary and the audio.")]
+       ("4  Close the loop","The recording lands in HavenIQ's own object store and is attached to the ticket, and a second agent, the case worker, files the call: category, facts, follow-ups.")]
 for i,(t,b) in enumerate(steps):
     y=1.75+i*1.25; box(s,0.7,y,3.2,1.0,t,"",SOFT,SOFT,15,10,ACC); text(s,4.1,y+0.12,8.5,0.9,b,14,False,INK)
 text(s,0.7,6.85,11.9,0.4,"Interrupt any time; the agent handles interruptions the same way you just did.",12,False,MUTED,italic=True)
