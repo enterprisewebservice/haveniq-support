@@ -1,9 +1,15 @@
-# A brain route for the case worker. See the description inside; the guardrails front door stays the route for people.
+# A brain route made for the case worker (retired 19 Nov 2026; the route stays). See the description inside; the
+# guardrails front door stays the route for people.
+#
+# NOT synced by Argo, applied by hand like deploy/argo/haveniq.yaml:  oc apply -f deploy/cluster-scoped/
+# ModelConnection is a cluster-wide kind and the Argo project `haveniq` may only create namespaced objects (plus its
+# own Namespace). While this file sat in deploy/manifests, Argo refused the WHOLE application ("resource
+# agentoffice.ai:ModelConnection is not permitted in project haveniq") and nothing in that folder synced from
+# 13 Sep to 19 Nov 2026.
 apiVersion: agentoffice.ai/v1alpha1
 kind: ModelConnection
 metadata:
   name: claude-direct
-  namespace: agent-office
 spec:
   access:
     groups:

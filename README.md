@@ -51,7 +51,8 @@ Retired on 19 Nov 2026. It was a second agent, declared the framework way in `de
 AgentGateway, an AgentWorkstation with its own generated gateway caller key, and a Skill artifact that says how to file a
 call. When a call ended the voice worker posted the transcript to the case worker's OpenAI-compatible face; the case
 worker confirmed the account, opened the ticket if the voice agent could not, added one structured note and replied with
-a three-line filing. Its brain was the `claude-direct` ModelConnection (`61-model-connection.yaml`, still declared).
+a three-line filing. Its brain was the `claude-direct` ModelConnection, still declared in
+`deploy/cluster-scoped/61-model-connection.yaml` (applied by hand: the Argo project may not create cluster-wide objects).
 
 To bring it back, restore that manifest, the `case-gateway-token` ExternalSecret and `haveniq-case-token` grant in
 `13-mirrored-secrets.yaml`, and the three `CASE_*` settings in `42-voice.yaml` from the commit before the retirement.
