@@ -47,11 +47,12 @@ then join the room with a token and type in LiveKit Meet's chat; the worker trea
 
 ## The case worker
 
-A second agent, declared the framework way in `deploy/manifests/60-case-worker.yaml`: an AgentGateway, an AgentWorkstation
-with its own generated gateway caller key, and a Skill artifact that says how to file a call. When a call ends the voice
-worker posts the transcript to the case worker's OpenAI-compatible face; the case worker confirms the account, opens the
-ticket if the voice agent could not, adds one structured note (category, questions and answers with their facts, actions,
-follow-ups from the account state, sentiment) and replies with a three-line filing. Support staff can also ask it about a
-call in its Mattermost channel. Its brain is the `claude-direct` ModelConnection (`61-model-connection.yaml`): the same
-models and key as `claude-work`, straight to the model desk, because the guardrails orchestrator rejects the structured
-message content the openclaw runtime sends.
+Retired on 19 Nov 2026. It was a second agent, declared the framework way in `deploy/manifests/60-case-worker.yaml`: an
+AgentGateway, an AgentWorkstation with its own generated gateway caller key, and a Skill artifact that says how to file a
+call. When a call ended the voice worker posted the transcript to the case worker's OpenAI-compatible face; the case
+worker confirmed the account, opened the ticket if the voice agent could not, added one structured note and replied with
+a three-line filing. Its brain was the `claude-direct` ModelConnection (`61-model-connection.yaml`, still declared).
+
+To bring it back, restore that manifest, the `case-gateway-token` ExternalSecret and `haveniq-case-token` grant in
+`13-mirrored-secrets.yaml`, and the three `CASE_*` settings in `42-voice.yaml` from the commit before the retirement.
+The voice worker skips the after-call filing when those settings are absent.
